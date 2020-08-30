@@ -6,6 +6,7 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject, QTimer
 from bluetooth_ui import Ui_bluetooth
 from UDPBeep import udpbeep
+from ConfigReader import Configuration
 
 class MyDelegate(DefaultDelegate):
     # Constructor (run once on startup)
@@ -60,8 +61,8 @@ class ble_UT363 (QObject):
     def __init__(self):
         super().__init__()
         self.UT363 = None
+        self.udp = None
         self.udp = udpbeep("192.168.1.251", 4445)
-        print(self.udp)
         self.wind_sig.connect(self.send_udpwind)
         self.timerRx = QtCore.QTimer(self)
         self.timerRx.timeout.connect(self.writeRxCharacteristic)
@@ -95,7 +96,8 @@ class ble_UT363 (QObject):
     def send_udpwind(self, value, unit):
         msg = "wind -1 " + value + " " + unit
         #print(msg)
-        self.udp.sendData(msg)
+        if self.udp is not None:
+            self.udp.sendData(msg)
 
     def isconnected(self):
         return self.UT363 is not None
@@ -118,7 +120,7 @@ class ble_UT363 (QObject):
             print(" " + str(descriptor.uuid) + "  0x" + format(descriptor.handle, "02X") + "   " + str(descriptor))
 
 
-class WindowsTest(QtWidgets.QMainWindow):
+class Windows(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.MainWindow = QtWidgets.QMainWindow()
@@ -128,10 +130,13 @@ class WindowsTest(QtWidgets.QMainWindow):
         self.ui.buttonDisconnect.clicked.connect(self.disconnect)
         self.ui.buttonQuit.clicked.connect(exit)
         self.ble = ble_UT363()
+        self.ble_address = Configuration("addresslist.json")
         self.ble.wind_sig.connect(self.display_wind)
         self.ble.temp_sig.connect(self.display_temp)
         self.display_temp(" -- ", " -- ")
         self.display_wind(" -- ", " -- ")
+        for i in self.ble_address.conf:
+            self.ui.btaddress.addItem(i, self.ble_address.conf[i])
         self.MainWindow.show()
 
     def disconnect(self):
@@ -141,7 +146,10 @@ class WindowsTest(QtWidgets.QMainWindow):
 
     def connect(self):
         if not self.ble.isconnected():
-            self.ble.connect(self.ui.btaddress.text())
+            try:
+                self.ble.connect(self.ui.btaddress.currentData())
+            except:
+                print("device not present")
         return self.ble.isconnected()
 
     def display_temp(self, str_value, unit):
@@ -163,8 +171,6 @@ if __name__ == '__main__':
 
     app = QtWidgets.QApplication(sys.argv)
 
-    windows = WindowsTest()
+    windows = Windows()
     sys.exit(app.exec())
-
-    #YOUR_DEVICE_ADDRESS = "50:33:8B:12:68:E5"
 
