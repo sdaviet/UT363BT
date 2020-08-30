@@ -60,7 +60,8 @@ class ble_UT363 (QObject):
     def __init__(self):
         super().__init__()
         self.UT363 = None
-        self.udp = udpbeep("255.255.255.255", 4445)
+        self.udp = udpbeep("192.168.1.251", 4445)
+        print(self.udp)
         self.wind_sig.connect(self.send_udpwind)
         self.timerRx = QtCore.QTimer(self)
         self.timerRx.timeout.connect(self.writeRxCharacteristic)
