@@ -47,6 +47,7 @@ class find_ip():
         f = os.popen('ifconfig')
         for iface in [' '.join(i) for i in
                       iter(lambda: list(itertools.takewhile(lambda l: not l.isspace(), f)), [])]:
+            print(iface)
             int = re.findall('^(eth?|wlan?|enp?)[0-9]', iface)
             if int and re.findall('RUNNING', iface):
                 ip = re.findall(r'(?<=inet\s)[\d.-]+', iface)
