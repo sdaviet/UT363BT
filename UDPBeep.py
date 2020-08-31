@@ -44,21 +44,22 @@ class find_ip():
         import re
 
 
+        ip = []
+        broadcast = []
         f = os.popen('ifconfig')
         for iface in [' '.join(i) for i in
                       iter(lambda: list(itertools.takewhile(lambda l: not l.isspace(), f)), [])]:
-            print(iface)
             int = re.findall('^(eth?|wlan?|enp?)[0-9]', iface)
             if int and re.findall('RUNNING', iface):
-                ip = re.findall(r'(?<=inet\s)[\d.-]+', iface)
-                broadcast = re.findall(r'(?<=broadcast\s)[\d.-]+', iface)
-                if ip and int and broadcast:
-                    return int, ip, broadcast
-        return False
+                ip.append(re.findall(r'(?<=inet\s)[\d.-]+', iface)[0])
+                broadcast.append(re.findall(r'(?<=broadcast\s)[\d.-]+', iface)[0])
+        return ip, broadcast
 
 if __name__ == '__main__':
     print ("UDP Beep Debug")
     #udpbeep = udpBeep ("192.168.0.22", 4445)
+    print(find_ip().get_ip())
+    '''
     udpBeep = udpbeep ("255.255.255.255", 4445)
     end=False
 
@@ -70,6 +71,4 @@ if __name__ == '__main__':
             end = True
         else:
             udpBeep.send()
-
-
-
+   '''

@@ -27,7 +27,6 @@ class MyDelegate(DefaultDelegate):
             function = data_str[4]
             real_time_unit_text = data_str[14]
             value = str(float(data[5:11].decode("utf-8")))
-            print(value)
             if function == "30": #temperature
                 if value.find("L") == -1:
                     if real_time_unit_text=="30": #°C
@@ -63,9 +62,13 @@ class ble_UT363 (QObject):
         self.UT363 = None
         self.udp = None
         from UDPBeep import find_ip
-        ip = find_ip().get_ip()
-        print(ip)
-        self.udp = udpbeep("192.168.1.251", 4445)
+        ip, broadcast = find_ip().get_ip()
+        if len(ip)>0:
+           index = 0
+           if "192.168.1.251" in ip:
+              index = ip.index("192.168.1.251")
+           print(broadcast[index])
+           self.udp = udpbeep(broadcast[index], 4445)
         self.wind_sig.connect(self.send_udpwind)
         self.timerRx = QtCore.QTimer(self)
         self.timerRx.timeout.connect(self.writeRxCharacteristic)
