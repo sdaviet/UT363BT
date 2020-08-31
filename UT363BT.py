@@ -62,6 +62,9 @@ class ble_UT363 (QObject):
         super().__init__()
         self.UT363 = None
         self.udp = None
+        from UDPBeep import find_ip
+        ip = find_ip().get_ip()
+        print(ip)
         self.udp = udpbeep("192.168.1.251", 4445)
         self.wind_sig.connect(self.send_udpwind)
         self.timerRx = QtCore.QTimer(self)
@@ -166,8 +169,6 @@ if __name__ == '__main__':
     import subprocess
     import shlex
     import getpass
-
-
 
     app = QtWidgets.QApplication(sys.argv)
 
