@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
-from bluepy.btle import UUID, Peripheral, DefaultDelegate
+from bluepy.btle import UUID, Peripheral, DefaultDelegate, BTLEException
 import struct
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject, QTimer
 from bluetooth_ui import Ui_bluetooth
 from UDPBeep import udpbeep
 from ConfigReader import Configuration
+
+DEFAULT_STRING = " -- "
 
 class MyDelegate(DefaultDelegate):
     # Constructor (run once on startup)
@@ -75,8 +77,11 @@ class ble_UT363 (QObject):
 
     def disconnect(self):
         self.timerRx.stop()
-        self.UT363.disconnect()
-        self.UT363 = None
+        self.wind_sig.emit(DEFAULT_STRING, DEFAULT_STRING)
+        self.temp_sig.emit(DEFAULT_STRING, DEFAULT_STRING)
+        if self.UT363 is not None:
+            self.UT363.disconnect()
+            self.UT363 = None
 
     def connect(self, address):
         self.UT363 = Peripheral(address)
@@ -90,14 +95,22 @@ class ble_UT363 (QObject):
         if RxService:
             TxChar = RxService.getCharacteristics(self.WX_NOTIFICATION_UUID)[0]
             if TxChar:
-                TxChar.write(struct.pack('<B', True))
+                try:
+                    TxChar.write(struct.pack('<B', True))
+                except BTLEException as e:
+                    print("BTLE write error : ", type(e).__name__)
+                    self.disconnect()
 
     def writeRxCharacteristic(self):
         RxService = self.UT363.getServiceByUUID(self.WX_SERVICE_UUID)
         if RxService:
             RxChar = RxService.getCharacteristics(self.WX_CHAR_UUID)[0]
             if RxChar:
-                RxChar.write(struct.pack('<B', 0x5e))
+                try:
+                    RxChar.write(struct.pack('<B', 0x5e))
+                except BTLEException as e:
+                    print("BTLE write error : ", type(e).__name__)
+                    self.disconnect()
 
     def send_udpwind(self, value, unit):
         msg = "wind -1 " + value + " " + unit
@@ -139,16 +152,14 @@ class Windows(QtWidgets.QMainWindow):
         self.ble_address = Configuration("addresslist.json")
         self.ble.wind_sig.connect(self.display_wind)
         self.ble.temp_sig.connect(self.display_temp)
-        self.display_temp(" -- ", " -- ")
-        self.display_wind(" -- ", " -- ")
+        self.display_temp(DEFAULT_STRING, DEFAULT_STRING)
+        self.display_wind(DEFAULT_STRING, DEFAULT_STRING)
         for i in self.ble_address.conf:
             self.ui.btaddress.addItem(i, self.ble_address.conf[i])
         self.MainWindow.show()
 
     def disconnect(self):
         self.ble.disconnect()
-        self.display_temp(" -- ", " -- ")
-        self.display_wind(" -- ", " -- ")
 
     def connect(self):
         if not self.ble.isconnected():
