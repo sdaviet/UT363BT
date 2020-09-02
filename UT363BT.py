@@ -113,10 +113,11 @@ class ble_UT363 (QObject):
                     self.disconnect()
 
     def send_udpwind(self, value, unit):
-        msg = "wind -1 " + value + " " + unit
-        #print(msg)
-        if self.udp is not None:
-            self.udp.sendData(msg)
+        if value != DEFAULT_STRING and unit != DEFAULT_STRING:
+            msg = "wind -1 " + value + " " + unit
+            #print(msg)
+            if self.udp is not None:
+                self.udp.sendData(msg)
 
     def isconnected(self):
         return self.UT363 is not None
