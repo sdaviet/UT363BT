@@ -114,7 +114,7 @@ class ble_UT363 (QObject):
 
     def send_udpwind(self, value, unit):
         if value != DEFAULT_STRING and unit != DEFAULT_STRING:
-            msg = "wind -1 " + value + " " + unit
+            msg = "wind_speed " + value + " " + unit
             #print(msg)
             if self.udp is not None:
                 self.udp.sendData(msg)
