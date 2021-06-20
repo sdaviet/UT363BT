@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+import time
+from argparse import ArgumentParser
 
 from bluepy.btle import UUID, Peripheral, DefaultDelegate, BTLEException
 import struct
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import pyqtSignal, QObject, QTimer
+from PyQt5.QtCore import pyqtSignal, QObject, QTimer, QThread
 from bluetooth_ui import Ui_bluetooth
 from UDPBeep import udpbeep
 from ConfigReader import Configuration
@@ -58,6 +60,7 @@ class ble_UT363 (QObject):
     WX_NOTIFICATION_UUID = "0000FF02-0000-1000-8000-00805f9b34fb"
     wind_sig = pyqtSignal(str, str)
     temp_sig = pyqtSignal(str, str)
+    disconnect_sig = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -77,11 +80,14 @@ class ble_UT363 (QObject):
 
     def disconnect(self):
         self.timerRx.stop()
+        if self.udp is not None:
+            self.udp.sendData("wind_speed -1 m/s")
         self.wind_sig.emit(DEFAULT_STRING, DEFAULT_STRING)
         self.temp_sig.emit(DEFAULT_STRING, DEFAULT_STRING)
         if self.UT363 is not None:
             self.UT363.disconnect()
             self.UT363 = None
+        self.disconnect_sig.emit()
 
     def connect(self, address):
         self.UT363 = Peripheral(address)
@@ -115,7 +121,7 @@ class ble_UT363 (QObject):
     def send_udpwind(self, value, unit):
         if value != DEFAULT_STRING and unit != DEFAULT_STRING:
             msg = "wind_speed " + value + " " + unit
-            #print(msg)
+            print(msg)
             if self.udp is not None:
                 self.udp.sendData(msg)
 
@@ -178,6 +184,30 @@ class Windows(QtWidgets.QMainWindow):
         self.ui.wind_value.setText(str_value)
         self.ui.wind_unit.setText(unit)
 
+class nodisplay(QTimer):
+    def __init__(self):
+        super().__init__()
+        self.ble = ble_UT363()
+        self.ble.disconnect_sig.connect(self.connect)
+        self.ble_address = list(Configuration("addresslist.json").conf.values())
+        self.singleShot(1000, self.connect)
+
+
+    def connect(self):
+        index = 0
+        while not self.ble.isconnected():
+            try:
+                self.ble.connect(self.ble_address[index])
+            except:
+                print("device not present : ", self.ble_address[index])
+            if not self.ble.isconnected():
+                if index >= len(self.ble_address):
+                    index = 0
+                else:
+                    index += 1
+            else:
+                print("device connected")
+            time.sleep(2)
 
 if __name__ == '__main__':
     import sys
@@ -185,8 +215,14 @@ if __name__ == '__main__':
     import shlex
     import getpass
 
+    parser = ArgumentParser(prog='UT363BT')
+    parser.add_argument("display", help="display""dislay"" no display ", type=str)
+    args = parser.parse_args()
     app = QtWidgets.QApplication(sys.argv)
 
-    windows = Windows()
-    sys.exit(app.exec())
+    if args.display == "display":
+        windows = Windows()
+    else:
+        ble_nodisplay = nodisplay()
 
+    sys.exit(app.exec())
