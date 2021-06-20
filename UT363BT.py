@@ -201,13 +201,11 @@ class nodisplay(QTimer):
             except:
                 print("device not present : ", self.ble_address[index])
             if not self.ble.isconnected():
+                index += 1
                 if index >= len(self.ble_address):
                     index = 0
-                else:
-                    index += 1
             else:
                 print("device connected")
-            time.sleep(2)
 
 if __name__ == '__main__':
     import sys
