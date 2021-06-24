@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from bluepy.btle import UUID, Peripheral, DefaultDelegate, BTLEException
 import struct
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import pyqtSignal, QObject, QTimer, QThread
+from PyQt5.QtCore import pyqtSignal, QObject, QTimer, QThread, QCoreApplication
 from bluetooth_ui import Ui_bluetooth
 from UDPBeep import udpbeep
 from ConfigReader import Configuration
@@ -216,11 +216,14 @@ if __name__ == '__main__':
     parser = ArgumentParser(prog='UT363BT')
     parser.add_argument("display", help="display""dislay"" no display ", type=str)
     args = parser.parse_args()
-    app = QtWidgets.QApplication(sys.argv)
 
     if args.display == "display":
+        print("Starting with display enabled")
+        app = QtWidgets.QApplication(sys.argv)
         windows = Windows()
     else:
+        print("Starting with display disabled")
+        app = QCoreApplication(sys.argv)
         ble_nodisplay = nodisplay()
 
     sys.exit(app.exec())
