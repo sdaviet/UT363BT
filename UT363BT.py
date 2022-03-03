@@ -1,4 +1,19 @@
-#!/usr/bin/env python
+#
+# This file is part of the F3FChrono distribution (https://github.com/jomarin38/F3FChrono).
+# Copyright (c) 2021 Sylvain DAVIET, Joel MARIN.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 import time
 from argparse import ArgumentParser
 
@@ -7,7 +22,8 @@ import struct
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import pyqtSignal, QObject, QTimer, QThread, QCoreApplication
 from bluetooth_ui import Ui_bluetooth
-from UDPBeep import udpbeep
+from UDPSend import udpsend
+from UDPReceive import udpreceive
 from ConfigReader import Configuration
 
 DEFAULT_STRING = " -- "
@@ -60,23 +76,41 @@ class ble_UT363 (QObject):
     WX_NOTIFICATION_UUID = "0000FF02-0000-1000-8000-00805f9b34fb"
     wind_sig = pyqtSignal(str, str)
     temp_sig = pyqtSignal(str, str)
+
     disconnect_sig = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.UT363 = None
         self.udp = None
-        from UDPBeep import find_ip
+        from UDPSend import find_ip
         ip, broadcast = find_ip().get_ip()
         if len(ip)>0:
            index = 0
            if "192.168.1.251" in ip:
               index = ip.index("192.168.1.251")
            print(broadcast[index])
-           self.udp = udpbeep(broadcast[index], 4445)
+           self.udp = udpsend(broadcast[index], 4445)
+
+        self.udpreceive = udpreceive(4445)
+        self.udpreceive.AnemometerGetList_sig.connect(self.getList)
+        self.udpreceive.AnemometerConnect_sig.connect(self.udpConnect)
+        self.ble_address = Configuration("addresslist.json")
+
         self.wind_sig.connect(self.send_udpwind)
         self.timerRx = QtCore.QTimer(self)
         self.timerRx.timeout.connect(self.writeRxCharacteristic)
+
+    def getList(self):
+        data = "anemometerList " + str(len(self.ble_address.conf))
+        for i in self.ble_address.conf:
+            data += " " + i
+        print(data)
+        self.udp.sendData(data)
+        self.udp.sendData("anemometerStatus notConnected")
+
+    def udpConnect(self, index):
+        self.connect(self.ble_address.conf[index])
 
     def disconnect(self):
         self.timerRx.stop()
@@ -88,13 +122,19 @@ class ble_UT363 (QObject):
             self.UT363.disconnect()
             self.UT363 = None
         self.disconnect_sig.emit()
+        self.udp.sendData("anemometerStatus notConnected")
 
     def connect(self, address):
-        self.UT363 = Peripheral(address)
-        if self.UT363:
-            self.UT363.setDelegate(MyDelegate(self.UT363, self.temp_sig, self.wind_sig))
-            self.enableTxNotification()
-            self.timerRx.start(800)
+        self.udp.sendData("anemometerStatus ConnectionInProgress")
+        try:
+            self.UT363 = Peripheral(address)
+            if self.UT363:
+                self.UT363.setDelegate(MyDelegate(self.UT363, self.temp_sig, self.wind_sig))
+                self.enableTxNotification()
+                self.timerRx.start(800)
+                self.udp.sendData("anemometerStatus Connected")
+        except BTLEException as e:
+            self.udp.sendData("anemometerStatus notConnected")
 
     def enableTxNotification(self):
         RxService = self.UT363.getServiceByUUID(self.WX_SERVICE_UUID)
@@ -156,13 +196,13 @@ class Windows(QtWidgets.QMainWindow):
         self.ui.buttonDisconnect.clicked.connect(self.disconnect)
         self.ui.buttonQuit.clicked.connect(exit)
         self.ble = ble_UT363()
-        self.ble_address = Configuration("addresslist.json")
         self.ble.wind_sig.connect(self.display_wind)
         self.ble.temp_sig.connect(self.display_temp)
         self.display_temp(DEFAULT_STRING, DEFAULT_STRING)
         self.display_wind(DEFAULT_STRING, DEFAULT_STRING)
-        for i in self.ble_address.conf:
-            self.ui.btaddress.addItem(i, self.ble_address.conf[i])
+        self.ble.udpreceive.AnemometerConnect_sig.connect(self.updateGui)
+        for i in self.ble.ble_address.conf:
+            self.ui.btaddress.addItem(i, self.ble.ble_address.conf[i])
         self.MainWindow.show()
 
     def disconnect(self):
@@ -176,6 +216,9 @@ class Windows(QtWidgets.QMainWindow):
                 print("device not present")
         return self.ble.isconnected()
 
+    def updateGui(self, index):
+        self.ui.btaddress.setCurrentText(index)
+
     def display_temp(self, str_value, unit):
         self.ui.temp_value.setText(str_value)
         self.ui.temp_unit.setText(unit)
@@ -184,28 +227,23 @@ class Windows(QtWidgets.QMainWindow):
         self.ui.wind_value.setText(str_value)
         self.ui.wind_unit.setText(unit)
 
-class nodisplay(QTimer):
+class nodisplay():
     def __init__(self):
         super().__init__()
         self.ble = ble_UT363()
-        self.ble.disconnect_sig.connect(self.connect)
-        self.ble_address = list(Configuration("addresslist.json").conf.values())
-        self.singleShot(1000, self.connect)
+        self.ble.disconnect_sig.connect(self.disconnect)
 
-
-    def connect(self):
+    def connect(self, index):
         index = 0
-        while not self.ble.isconnected():
-            try:
-                self.ble.connect(self.ble_address[index])
-            except:
-                print("device not present : ", self.ble_address[index])
-            if not self.ble.isconnected():
-                index += 1
-                if index >= len(self.ble_address):
-                    index = 0
-            else:
-                print("device connected")
+        try:
+            self.ble.connect(self.ble.ble_address[index])
+        except:
+            print("device not present : ", self.ble.ble_address[index])
+        if self.ble.isconnected():
+            print("device connected")
+
+    def disconnect(self):
+        print("device disconnected")
 
 if __name__ == '__main__':
     import sys

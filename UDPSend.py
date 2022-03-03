@@ -1,6 +1,19 @@
-#-udp fonctionnal test
-#vim: set et sw=4 sts=4 fileencoding=utf-8:
-
+#
+# This file is part of the F3FChrono distribution (https://github.com/jomarin38/F3FChrono).
+# Copyright (c) 2021 Sylvain DAVIET, Joel MARIN.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 import socket
 import time
 import logging
@@ -11,7 +24,7 @@ from PyQt5.QtCore import QObject
 INITMSG = "Init"
 EVENTMSG = "Event"
 
-class udpbeep(QObject):
+class udpsend(QObject):
     def __init__(self, udpip, udpport):
         super(QObject, self).__init__()
         self.udpip = udpip
@@ -28,6 +41,7 @@ class udpbeep(QObject):
 
     def sendData(self, data):
         self.sock.sendto(bytes(data, 'utf-8'), (self.udpip, self.port))
+        print (data)
 
     def terminate(self):
         print('terminated event')
